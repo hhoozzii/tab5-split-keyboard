@@ -1,0 +1,16 @@
+cmake_minimum_required(VERSION 3.16)
+project(tab5kb_desktop CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+add_compile_options(-Wall -Wextra)
+
+add_library(kbengine STATIC engine/keymap_engine.cpp)
+add_library(kbcore STATIC core/touch_tracker.cpp core/key_layout.cpp)
+add_executable(test_engine tests/test_engine.cpp)
+target_link_libraries(test_engine kbengine)
+add_executable(test_core tests/test_core.cpp)
+target_link_libraries(test_core kbcore)
+
+enable_testing()
+add_test(NAME engine COMMAND test_engine)
+add_test(NAME core COMMAND test_core)

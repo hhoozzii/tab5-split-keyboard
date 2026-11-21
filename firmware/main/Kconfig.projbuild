@@ -1,0 +1,16 @@
+menu "Tab5 keyboard"
+    choice TAB5KB_HALF
+        prompt "Which half is this unit?"
+        default TAB5KB_HALF_LEFT
+        config TAB5KB_HALF_LEFT
+            bool "Left (keys 0-4 per row + thumbs 30-32)"
+        config TAB5KB_HALF_RIGHT
+            bool "Right (keys 5-9 per row + thumbs 33-35)"
+    endchoice
+    config TAB5KB_ROTATE_FLIP
+        bool "Flip the landscape UI by 180 degrees"
+        default n
+        help
+            Default puts the status band toward the Tab5's camera edge. Turn this on if the
+            screen shows upside down.
+endmenu

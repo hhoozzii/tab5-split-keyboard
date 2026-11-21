@@ -1,0 +1,8 @@
+dependencies:
+  idf: ">=5.4"
+  espressif/m5stack_tab5: "^1.2.0"
+  espressif/esp_hosted: "2.13.0"
+  espressif/esp_wifi_remote:
+    rules:
+    - if: target in [esp32p4, esp32h2]
+    version: '>=0.10'
