@@ -1,11 +1,8 @@
 build/
 **/build/
 managed_components/
-dependencies.lock
 sdkconfig
 sdkconfig.old
 c6tool/fw/*.bin
-firmware/components/imu/bosch/*.c
-firmware/components/imu/bosch/*.h
 __pycache__/
 *.zip

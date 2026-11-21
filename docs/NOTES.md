@@ -21,7 +21,7 @@
 
 ## Build and flash (Windows)
 - Use the ESP-IDF 5.4 PowerShell; project at C:\vccode\tab5kb, firmware in `firmware`.
-- First run after cloning: `powershell -ExecutionPolicy Bypass -File tools\get_bmi270.ps1` (downloads the Bosch driver into firmware\components\imu\bosch) and, for the C6 tool, `c6tool\get_c6_fw.ps1`.
+- After cloning: the Bosch driver and lock files are in the repo. Only the C6 image needs downloading: `c6tool\get_c6_fw.ps1`. (`tools\get_bmi270.ps1` re-downloads the Bosch driver if you ever need a fresh copy.)
 - Half is a menuconfig setting (`Tab5 keyboard` -> Left/Right): `idf.py menuconfig`, then `idf.py -p COM12 flash` (left) and again for `COM13` (right). `flash` builds first.
 - If you copy changed source files in, set `LastWriteTime = Get-Date` on them so ninja rebuilds (copied files keep their old date).
 - "opening dependency file ... .obj.d" or "loading build.ninja" errors = corrupted build folder: `idf.py fullclean`, rebuild. Don't paste log text or `<placeholder>` into PowerShell.
