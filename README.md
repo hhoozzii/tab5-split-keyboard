@@ -1,27 +1,64 @@
-# tab5kb: 36-key Miryoku split keyboard on two M5Stack Tab5
+# Tab5 split keyboard
 
-See docs/NOTES.md for how it works and how to build and flash it. Original engine notes below.
+A 36-key [Miryoku](https://github.com/manna-harbour/miryoku_zmk) split keyboard built from two M5Stack Tab5 units
+(ESP32-P4 + ESP32-C6). Multi-touch, home-row mods and thumb layers like Miryoku ZMK, Bluetooth HID to the PC,
+a Bluetooth split link between the halves, secure pairing, auto-flip with the IMU, mouse keys, caps word,
+four Bluetooth profiles and eight key-press sounds. Layer table generated from the
+[hhoozzii/miryoku_zmk](https://github.com/hhoozzii/miryoku_zmk) fork.
 
-# tab5kb engine
+Status: complete and tested on hardware (2026-11-20).
 
-Hardware-independent keymap engine for the 36-key split keyboard on two M5Stack Tab5s.
-Behaves like Miryoku ZMK (tap-preferred hold-taps, 200 ms, double-tap layer jumps).
+## Quick start (Windows, ESP-IDF 5.4.x PowerShell)
 
-    engine/keymap_types.h        Binding/Keycode types, key position order
-    engine/keymap_engine.{h,cpp} keyEvent()/tick() in -> HID reports, layer changes, special actions out
-    engine/miryoku_keymap.h      GENERATED from your fork (QWERTY base, 10 layers)
-    tools/gen_keymap.py          regenerate:  python tools/gen_keymap.py <miryoku_zmk dir> engine/miryoku_keymap.h QWERTY
-    tests/test_engine.cpp        desktop tests
+    git clone https://github.com/hhoozzii/tab5-split-keyboard C:\vccode\tab5kb
+    cd C:\vccode\tab5kb\firmware
+    idf.py set-target esp32p4
+    idf.py menuconfig                  # Tab5 keyboard -> Left
+    idf.py -p COM12 flash monitor
+    idf.py menuconfig                  # Tab5 keyboard -> Right
+    idf.py -p COM13 flash monitor
 
-Run tests (Windows, any C++17 compiler + CMake; in a VS Code terminal):
+Use ESP-IDF **5.4.x**: the Tab5's P4 is silicon v1.3, which 5.5 does not support. The C6 must run ESP-Hosted 2.12.x
+(see `c6tool/`). Everything else (hardware facts, gotchas, architecture) is in [docs/NOTES.md](docs/NOTES.md).
+
+## Where to change things
+
+| To change | Edit | Then |
+|---|---|---|
+| Keymap, layers, labels | `tools/gen_keymap.py` output `engine/miryoku_keymap.h` (`python tools/gen_keymap.py <miryoku_zmk dir> engine/miryoku_keymap.h QWERTY`) | rerun desktop tests, flash both halves |
+| Hold timing, hold-tap rules | `engine/keymap_engine.cpp` | tests, flash left half |
+| Mouse keys, caps word, BT profiles | `engine/specials.h` | tests, flash left half |
+| Key sounds (sounds, pitch, volume curve) | `engine/keysound.h`, controls in `firmware/main/main.cpp` (`sound_special`, `label_at`) | `tests/test_keysound.cpp`, flash both halves |
+| Key size, layout, tilt | `core/key_layout.h/.cpp` | tests, flash both halves |
+| Colours, text, status text, UI speed | `firmware/main/main.cpp` | flash both halves |
+| Bluetooth, pairing, split link, settings storage | `firmware/components/ble_kb/` | flash both halves (the link format is shared) |
+| IMU / auto-flip | `firmware/components/imu/`, `core/autorotate.h` | flash both halves |
+| C6 radio firmware | `c6tool/` (flash once per half) | see docs/NOTES.md |
+
+Split link note: both halves must run the same `ble_kb` and `main.cpp` version. The status write is 6 bytes
+(layer, mods, 3 keys, sound settings).
+
+## Tests (no hardware needed)
 
     cmake -S . -B build
     cmake --build build
     ctest --test-dir build --output-on-failure
 
-Key positions: 0-9 top row, 10-19 home row, 20-29 bottom row, 30-35 thumbs;
-left half = columns 0-4 of each row + thumbs 30-32, right half = the rest (isLeftHalf()).
-The right Tab5 only needs to send {pos, down/up, timestamp}; the left Tab5 runs the engine.
+Covers the keymap engine, touch tracking and layout, and the key-sound synth. The firmware itself can only be
+built with ESP-IDF on a PC with the Tab5s attached.
 
-Not implemented yet (emitted as Special actions for the firmware): mouse keys/wheel,
-caps word, BT profile select, output toggle, RGB, bootloader.
+## Layout of the repository
+
+    engine/      keymap engine, generated Miryoku table, special actions, key-sound synth (no hardware code)
+    core/        touch tracker, key layout and hit-testing, rotation and auto-flip logic (no hardware code)
+    firmware/    ESP-IDF project: main/main.cpp (UI, touch, audio), components/ble_kb, components/imu
+    c6tool/      separate ESP-IDF project that updates the Tab5's ESP32-C6 to ESP-Hosted 2.12.13
+    tools/       keymap generator, Bosch driver download script
+    tests/       desktop tests
+    docs/        NOTES.md: hardware facts, gotchas, architecture, build and flash
+
+## Third-party code
+
+`firmware/components/imu/bosch/` holds Bosch Sensortec's BMI270 driver (BSD-3-Clause, see the file headers).
+The C6 image is Espressif's prebuilt ESP-Hosted release, downloaded by `c6tool/get_c6_fw.ps1` and not stored here.
+No licence has been chosen for the rest of the code yet.

@@ -1,14 +1,12 @@
-# Firmware skeleton (ESP-IDF 5.4.x, ESP32-P4 v1.3 Tab5)
+# Firmware (ESP-IDF 5.4.x, ESP32-P4 rev v1.3, M5Stack Tab5)
 
-NOT compiled or run by me: I had no ESP-IDF here. Everything it calls that is not
-hardware (touch tracking, layout, engine) is unit-tested on the desktop
-(`cmake -S .. -B ../build && cmake --build ../build && ctest --test-dir ../build`).
-
-Build (ESP-IDF 5.4 PowerShell):
+Build and flash steps, hardware gotchas and architecture are in [../docs/NOTES.md](../docs/NOTES.md).
+Short version (ESP-IDF 5.4 PowerShell):
 
     cd firmware
-    idf.py set-target esp32p4
-    idf.py menuconfig          # Tab5 keyboard -> which half (left/right)
-    idf.py -p COM12 flash monitor
+    idf.py set-target esp32p4        # first time only
+    idf.py menuconfig                # Tab5 keyboard -> Left or Right
+    idf.py -p COM12 flash monitor    # left half; use the right half's port after switching to Right
 
-Keep the whole `tab5kb` folder together: `components/kb` pulls `../engine` and `../core`.
+`components/kb` compiles `../engine` and `../core`, so keep the repository together.
+Delete `sdkconfig` after editing `sdkconfig.defaults` (the defaults only apply when no sdkconfig exists).
