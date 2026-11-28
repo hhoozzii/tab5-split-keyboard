@@ -8,6 +8,10 @@ four Bluetooth profiles and eight key-press sounds. Layer table generated from t
 
 Status: complete and tested on hardware (2026-11-20).
 
+**Miryoku-inspired, not Miryoku.** This is an independent project that borrows the Miryoku layout idea (36 keys,
+home-row mods, thumb-driven layers) by Manna Harbour. It is not affiliated with or endorsed by the Miryoku project.
+The firmware is original code for the Tab5; no Miryoku source is included.
+
 ## Quick start (Windows, ESP-IDF 5.4.x PowerShell)
 
     git clone https://github.com/hhoozzii/tab5-split-keyboard C:\vccode\tab5kb
@@ -63,3 +67,7 @@ built with ESP-IDF on a PC with the Tab5s attached.
 `firmware/components/imu/bosch/` holds Bosch Sensortec's BMI270 driver (BSD-3-Clause, see the file headers).
 The C6 image is Espressif's prebuilt ESP-Hosted release, downloaded by `c6tool/get_c6_fw.ps1` and not stored here.
 No licence has been chosen for the rest of the code yet.
+
+## Licence
+
+MIT, see [LICENSE](LICENSE).
