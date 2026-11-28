@@ -1000,7 +1000,7 @@ int ble_kb_start(const char *device_name, ble_kb_role_t role, ble_kb_state_cb_t 
     if (esp_hosted_bt_controller_enable() != ESP_OK) ESP_LOGW(TAG, "bt controller enable failed");
   }
 
-  ret = nimble_port_init();
+  esp_err_t ret = nimble_port_init();
   if (ret != ESP_OK) { ESP_LOGE(TAG, "nimble_port_init failed: %d", ret); return -1; }
 
   ble_hs_cfg.reset_cb = on_reset;
