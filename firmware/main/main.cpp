@@ -36,11 +36,10 @@
 
 static const char* TAG = "tab5kb";
 
-#ifdef CONFIG_TAB5KB_HALF_RIGHT
-static constexpr kb::Half kHalf = kb::Half::Right;
-#else
-static constexpr kb::Half kHalf = kb::Half::Left;
-#endif
+// Which half this Tab5 is. One firmware serves both units: it is chosen on the first boot (choose_half) and
+// kept in flash. Hold a finger on the screen while powering on to choose again.
+static kb::Half kHalf = kb::Half::Left;
+static esp_lcd_touch_handle_t g_tp = nullptr;
 
 // Landscape UI. Deg270 turns the logical top toward the Tab5's camera edge; the menuconfig
 // "flip" option turns it the other way round.
@@ -79,7 +78,7 @@ static constexpr int kKeyRadius = 16;   // rounded key corners
 #else
 #define kThumbSmallFont (&lv_font_montserrat_14)
 #endif
-static kb::KeyLayout g_layout(kHalf, kLogicalW, kLogicalH);
+static kb::KeyLayout g_layout(kb::Half::Left, kLogicalW, kLogicalH);   // rebuilt for the chosen half in app_main
 static kb::Engine g_engine(kb::kMiryokuKeymap);
 static kb::Specials g_specials;   // mouse keys, caps word, Bluetooth profile select
 
@@ -90,7 +89,7 @@ static constexpr int kSndBlock = 256;   // frames per write (about 12 ms): enoug
 static kb::KeySynth g_synth(kSndRate);
 // The two Tab5 speakers are not equally loud: the right one is turned down to match the left (measured by ear:
 // clearly louder, so about -4 dB). Change this one number to tune it; 1.0 leaves a speaker as it is.
-static constexpr float kSpeakerTrim = (kHalf == kb::Half::Right) ? 0.6f : 1.0f;
+static constexpr float kRightSpeakerTrim = 0.6f;
 static volatile bool g_sndSave = false;     // settings changed: the audio task writes them to flash (left half)
 static volatile bool g_sndPush = false;     // settings changed or link came up: send them to the right half
 // Split link byte: bit7 valid (set by ble_kb), bits4-6 sound (0-7), bits0-3 volume (0-10), 15 = muted.
@@ -621,10 +620,9 @@ static bool refresh_ui() {   // false when the display was busy; the caller trie
 }
 
 static void touch_task(void*) {
-  esp_lcd_touch_handle_t tp = nullptr;
-  esp_err_t err = bsp_touch_new(nullptr, &tp);
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "bsp_touch_new failed: %s", esp_err_to_name(err));
+  esp_lcd_touch_handle_t tp = g_tp;   // created in app_main (the half chooser needs it first)
+  if (!tp) {
+    ESP_LOGE(TAG, "no touch controller");
     vTaskDelete(nullptr);
   }
 
@@ -817,7 +815,7 @@ static void audio_task(void*) {
     return;
   }
   esp_codec_dev_set_out_vol(spk, 80);   // the codec stays at a fixed level; the volume keys scale the samples
-  g_synth.setTrim(kSpeakerTrim);
+  g_synth.setTrim(kHalf == kb::Half::Right ? kRightSpeakerTrim : 1.0f);
   ESP_LOGI(TAG, "key sounds ready");
   bool loaded = false;
   uint32_t t0 = nowMs();
@@ -835,6 +833,84 @@ static void audio_task(void*) {
   }
 }
 
+// First boot (nothing saved) or a finger held on the screen at power-on: ask which half this Tab5 is and keep the
+// answer in flash. Runs before the keyboard UI exists; the answer sets kHalf. Touches are read raw, like the keys.
+static kb::Half choose_half(esp_lcd_touch_handle_t tp) {
+  uint8_t saved = 0;
+  const bool have = ble_kb_setting_get("half", &saved) && (saved == 1 || saved == 2);
+  bool ask = !have;
+  if (have && tp) {   // a finger on the screen right after power-on asks again
+    vTaskDelay(pdMS_TO_TICKS(400));
+    for (int i = 0; i < 5 && !ask; i++) {
+      uint8_t n = 0;
+      esp_lcd_touch_point_data_t p[1];
+      if (esp_lcd_touch_read_data(tp) == ESP_OK && esp_lcd_touch_get_data(tp, p, &n, 1) == ESP_OK && n > 0) ask = true;
+      vTaskDelay(pdMS_TO_TICKS(60));
+    }
+  }
+  if (!ask) return saved == 2 ? kb::Half::Right : kb::Half::Left;
+
+  const struct { int x; uint32_t col; const char* txt; } btn[2] = {{kYesX, 0x2E6FD8, "LEFT"}, {kNoX, 0xE0872B, "RIGHT"}};
+  if (bsp_display_lock(0)) {
+    lv_obj_t* scr = lv_screen_active();
+    lv_obj_set_style_bg_color(scr, lv_color_hex(0x101010), 0);
+    lv_obj_t* t = lv_label_create(scr);
+    lv_obj_set_width(t, 1120);
+    lv_obj_set_pos(t, 80, 70);
+    lv_obj_set_style_text_align(t, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(t, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_text_font(t, &lv_font_montserrat_28, 0);
+    lv_label_set_text(t, "Which half is this Tab5?\n\nTap one. It is remembered.\n"
+                         "To change it later, hold a finger on the screen while powering on.");
+    for (const auto& b : btn) {
+      lv_obj_t* o = lv_obj_create(scr);
+      lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLLABLE);
+      lv_obj_remove_flag(o, LV_OBJ_FLAG_CLICKABLE);
+      lv_obj_set_pos(o, b.x, kBtnY);
+      lv_obj_set_size(o, kBtnW, kBtnH);
+      lv_obj_set_style_radius(o, 24, 0);
+      lv_obj_set_style_border_width(o, 0, 0);
+      lv_obj_set_style_bg_color(o, lv_color_hex(b.col), 0);
+      lv_obj_t* l = lv_label_create(o);
+      lv_label_set_text(l, b.txt);
+      lv_obj_set_style_text_color(l, lv_color_hex(0xFFFFFF), 0);
+      lv_obj_set_style_text_font(l, kThumbBigFont, 0);
+      lv_obj_center(l);
+    }
+    bsp_display_unlock();
+  }
+  kb::Half pick = kb::Half::Left;
+  bool done = false;
+  while (!done) {
+    uint8_t n = 0;
+    esp_lcd_touch_point_data_t p[kb::kMaxFingers];
+    if (tp && esp_lcd_touch_read_data(tp) == ESP_OK && esp_lcd_touch_get_data(tp, p, &n, kb::kMaxFingers) == ESP_OK) {
+      for (int i = 0; i < n && !done; i++) {
+        int lx, ly;
+        kb::panelToLogical(g_rot, p[i].x, p[i].y, lx, ly);
+        const kb::Pt pt = {int16_t(lx), int16_t(ly)};
+        if (inBox(pt, kYesX, kBtnY)) { pick = kb::Half::Left; done = true; }
+        else if (inBox(pt, kNoX, kBtnY)) { pick = kb::Half::Right; done = true; }
+      }
+    }
+    vTaskDelay(pdMS_TO_TICKS(20));
+  }
+  ble_kb_setting_set("half", pick == kb::Half::Right ? 2 : 1);
+  ESP_LOGI(TAG, "half chosen: %s", pick == kb::Half::Right ? "right" : "left");
+  // wait for the finger to lift so it does not land on a key, then clear the screen
+  for (int i = 0; i < 200; i++) {
+    uint8_t n = 0;
+    esp_lcd_touch_point_data_t p[1];
+    if (tp && esp_lcd_touch_read_data(tp) == ESP_OK && esp_lcd_touch_get_data(tp, p, &n, 1) == ESP_OK && n == 0) break;
+    vTaskDelay(pdMS_TO_TICKS(20));
+  }
+  if (bsp_display_lock(0)) {
+    lv_obj_clean(lv_screen_active());
+    bsp_display_unlock();
+  }
+  return pick;
+}
+
 extern "C" void app_main(void) {
   lv_display_t* disp = bsp_display_start();
   g_disp = disp;
@@ -845,6 +921,12 @@ extern "C" void app_main(void) {
   bsp_display_backlight_on();
   if (bsp_display_lock(0)) {
     bsp_display_rotate(disp, g_rot == kb::Rot::Deg90 ? LV_DISPLAY_ROTATION_90 : LV_DISPLAY_ROTATION_270);
+    bsp_display_unlock();
+  }
+  if (bsp_touch_new(nullptr, &g_tp) != ESP_OK) ESP_LOGE(TAG, "bsp_touch_new failed");
+  kHalf = choose_half(g_tp);
+  g_layout = kb::KeyLayout(kHalf, kLogicalW, kLogicalH);
+  if (bsp_display_lock(0)) {
     build_ui();
     bsp_display_unlock();
   }

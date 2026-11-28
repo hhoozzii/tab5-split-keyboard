@@ -395,7 +395,20 @@ static void profile_load(void) {
 }
 
 // Small settings (key-sound options) kept in the same flash namespace.
+// Flash storage is needed before Bluetooth starts (the half choice is read at boot), so it is set up here too.
+void ble_kb_nvs_init(void) {
+  static bool done;
+  if (done) return;
+  esp_err_t ret = nvs_flash_init();
+  if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    ESP_ERROR_CHECK(nvs_flash_erase());
+    ret = nvs_flash_init();
+  }
+  ESP_ERROR_CHECK(ret);
+  done = true;
+}
 bool ble_kb_setting_get(const char *key, uint8_t *out) {
+  ble_kb_nvs_init();
   nvs_handle_t h;
   if (nvs_open("tab5kb", NVS_READONLY, &h) != ESP_OK) return false;
   const bool ok = nvs_get_u8(h, key, out) == ESP_OK;
@@ -403,6 +416,7 @@ bool ble_kb_setting_get(const char *key, uint8_t *out) {
   return ok;
 }
 void ble_kb_setting_set(const char *key, uint8_t v) {
+  ble_kb_nvs_init();
   nvs_handle_t h;
   if (nvs_open("tab5kb", NVS_READWRITE, &h) != ESP_OK) return;
   nvs_set_u8(h, key, v);
@@ -960,12 +974,7 @@ int ble_kb_start(const char *device_name, ble_kb_role_t role, ble_kb_state_cb_t 
   g_role = role;
   g_cb = cb;
 
-  esp_err_t ret = nvs_flash_init();
-  if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-    ESP_ERROR_CHECK(nvs_flash_erase());
-    ret = nvs_flash_init();
-  }
-  ESP_ERROR_CHECK(ret);
+  ble_kb_nvs_init();
 
   // Same sequence as the bleprph example. On this Tab5's old C6 firmware the two
   // controller calls time out (about 5 s each) but Bluetooth works anyway.

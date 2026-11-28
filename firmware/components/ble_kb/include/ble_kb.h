@@ -57,6 +57,7 @@ void ble_kb_send_mouse(uint8_t buttons, int8_t dx, int8_t dy, int8_t wheel, int8
 void ble_kb_select_profile(uint8_t profile);
 uint8_t ble_kb_profile(void);
 // Persistent one-byte settings (flash). get returns false when the key was never saved.
+void ble_kb_nvs_init(void);   // idempotent; the setting calls and ble_kb_start do this themselves
 bool ble_kb_setting_get(const char *key, uint8_t *out);
 void ble_kb_setting_set(const char *key, uint8_t v);
 // Consumer usage (e.g. 0xE9 volume up); 0 = release.

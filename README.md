@@ -13,10 +13,11 @@ Status: complete and tested on hardware (2026-11-20).
     git clone https://github.com/hhoozzii/tab5-split-keyboard C:\vccode\tab5kb
     cd C:\vccode\tab5kb\firmware
     idf.py set-target esp32p4
-    idf.py menuconfig                  # Tab5 keyboard -> Left
-    idf.py -p COM12 flash monitor
-    idf.py menuconfig                  # Tab5 keyboard -> Right
-    idf.py -p COM13 flash monitor
+    idf.py -p COM12 flash monitor      # first Tab5
+    idf.py -p COM13 flash monitor      # second Tab5 (same firmware)
+
+The same firmware runs on both. On first boot each Tab5 asks which half it is (tap LEFT or RIGHT); the answer is
+remembered. Hold a finger on the screen while powering on to be asked again.
 
 Use ESP-IDF **5.4.x**: the Tab5's P4 is silicon v1.3, which 5.5 does not support. The C6 must run ESP-Hosted 2.12.x
 (see `c6tool/`). Everything else (hardware facts, gotchas, architecture) is in [docs/NOTES.md](docs/NOTES.md).
